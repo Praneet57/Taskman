@@ -6,7 +6,16 @@ from database import engine
 import models
 from routers import users, tasks
 
-models.Base.metadata.create_all(bind=engine)
+import time, sqlalchemy
+
+for attempt in range(10):
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        print("✅ DB connected!")
+        break
+    except sqlalchemy.exc.OperationalError:
+        print(f"⏳ DB not ready, retrying ({attempt+1}/10)...")
+        time.sleep(3)
 
 app = FastAPI(title="TaskFlow - Task Manager", version="1.0.0")
 
