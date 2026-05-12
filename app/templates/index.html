@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+  <style>
+    body { background: #f0f4f8; font-family: 'Segoe UI', sans-serif; }
+    .sidebar { background: #1e293b; min-height: 100vh; color: white; padding: 20px; }
+    .sidebar h4 { font-weight: 700; letter-spacing: 1px; }
+    .sidebar .nav-link { color: #94a3b8; border-radius: 8px; }
+    .sidebar .nav-link:hover, .sidebar .nav-link.active { background: #334155; color: white; }
+    .task-card { border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.07); transition: transform .15s; }
+    .task-card:hover { transform: translateY(-2px); }
+    .badge-high { background-color: #fee2e2; color: #dc2626; }
+    .badge-medium { background-color: #fef9c3; color: #ca8a04; }
+    .badge-low { background-color: #dcfce7; color: #16a34a; }
+    .badge-completed { background-color: #d1fae5; color: #065f46; }
+    .badge-in_progress { background-color: #dbeafe; color: #1e40af; }
+    .badge-pending { background-color: #f3f4f6; color: #374151; }
+    #authSection { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .auth-card { max-width: 420px; width: 100%; border-radius: 16px; border: none; box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+    .deadline-near { border-left: 4px solid #f59e0b !important; }
+    .deadline-over { border-left: 4px solid #ef4444 !important; }
+  </style>
+</head>
+<body>
+
+<!-- AUTH SECTION -->
+<div id="authSection">
+  <div class="auth-card card p-4">
+    <div class="text-center mb-4">
+      <i class="bi bi-check2-square fs-1 text-primary"></i>
+      <h3 class="fw-bold mt-2">TaskFlow</h3>
+      <p class="text-muted small">Manage tasks. Stay productive.</p>
+    </div>
+    <ul class="nav nav-pills nav-fill mb-3" id="authTabs">
+      <li class="nav-item"><button class="nav-link active" onclick="switchAuth('login')">Login</button></li>
+      <li class="nav-item"><button class="nav-link" onclick="switchAuth('register')">Register</button></li>
+    </ul>
+
+    <!-- Login -->
+    <div id="loginForm">
+      <div class="mb-3"><input type="text" id="loginUser" class="form-control" placeholder="Username" /></div>
+      <div class="mb-3"><input type="password" id="loginPass" class="form-control" placeholder="Password" /></div>
+      <button class="btn btn-primary w-100" onclick="login()">Login <i class="bi bi-arrow-right"></i></button>
+    </div>
+
+    <!-- Register -->
+    <div id="registerForm" style="display:none">
+      <div class="mb-3"><input type="text" id="regUser" class="form-control" placeholder="Username" /></div>
+      <div class="mb-3"><input type="email" id="regEmail" class="form-control" placeholder="Email" /></div>
+      <div class="mb-3"><input type="password" id="regPass" class="form-control" placeholder="Password" /></div>
+      <button class="btn btn-success w-100" onclick="register()">Create Account</button>
+    </div>
+
+    <div id="authAlert" class="alert mt-3 d-none"></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appSection" style="display:none">
+  <div class="d-flex">
+    <div class="sidebar" style="width:240px; position:fixed; height:100vh; overflow-y:auto;">
+      <h4 class="mb-1"><i class="bi bi-check2-square me-2"></i>TaskFlow</h4>
+      <p class="text-muted small mb-4" id="sidebarUser"></p>
+      <nav class="nav flex-column gap-1 mb-4">
+        <a class="nav-link active" href="#" onclick="filterTasks('all')"><i class="bi bi-grid me-2"></i>All Tasks</a>
+        <a class="nav-link" href="#" onclick="filterTasks('pending')"><i class="bi bi-clock me-2"></i>Pending</a>
+        <a class="nav-link" href="#" onclick="filterTasks('in_progress')"><i class="bi bi-arrow-repeat me-2"></i>In Progress</a>
+        <a class="nav-link" href="#" onclick="filterTasks('completed')"><i class="bi bi-check-circle me-2"></i>Completed</a>
+      </nav>
+      <div class="mt-auto pt-4 border-top border-secondary">
+        <button class="btn btn-outline-danger btn-sm w-100" onclick="logout()"><i class="bi bi-box-arrow-left me-1"></i>Logout</button>
+      </div>
+    </div>
+
+    <div class="flex-grow-1 p-4" style="margin-left:240px;">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h4 class="fw-bold mb-0" id="pageTitle">All Tasks</h4>
+          <p class="text-muted small mb-0" id="taskCount"></p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#taskModal" onclick="openCreateModal()">
+          <i class="bi bi-plus-lg me-1"></i>New Task
+        </button>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="row g-3 mb-4" id="statsRow"></div>
+
+      <!-- Tasks List -->
+      <div id="tasksContainer" class="row g-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold" id="modalTitle">New Task</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body px-4">
+        <input type="hidden" id="editTaskId" />
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Title *</label>
+          <input type="text" id="taskTitle" class="form-control" placeholder="What needs to be done?" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Description</label>
+          <textarea id="taskDesc" class="form-control" rows="2" placeholder="Add details..."></textarea>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col">
+            <label class="form-label fw-semibold">Priority</label>
+            <select id="taskPriority" class="form-select">
+              <option value="low">🟢 Low</option>
+              <option value="medium" selected>🟡 Medium</option>
+              <option value="high">🔴 High</option>
+            </select>
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold">Status</label>
+            <select id="taskStatus" class="form-select">
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Deadline</label>
+          <input type="datetime-local" id="taskDeadline" class="form-control" />
+        </div>
+      </div>
+      <div class="modal-footer border-0 px-4">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary px-4" onclick="saveTask()">Save Task</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const API = "";
+  let token = localStorage.getItem("tf_token");
+  let currentFilter = "all";
+
+  if (token) showApp();
+
+  function switchAuth(tab) {
+    document.getElementById("loginForm").style.display = tab === "login" ? "block" : "none";
+    document.getElementById("registerForm").style.display = tab === "register" ? "block" : "none";
+    document.querySelectorAll("#authTabs .nav-link").forEach((el, i) => {
+      el.classList.toggle("active", (i === 0 && tab === "login") || (i === 1 && tab === "register"));
+    });
+  }
+
+  function showAuthAlert(msg, type = "danger") {
+    const el = document.getElementById("authAlert");
+    el.textContent = msg; el.className = `alert alert-${type} mt-3`;
+  }
+
+  async function login() {
+    const username = document.getElementById("loginUser").value;
+    const password = document.getElementById("loginPass").value;
+    const res = await fetch(`${API}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+    });
+    const data = await res.json();
+    if (res.ok) {
+      token = data.access_token;
+      localStorage.setItem("tf_token", token);
+      localStorage.setItem("tf_user", username);
+      showApp();
+    } else {
+      showAuthAlert(data.detail || "Login failed");
+    }
+  }
+
+  async function register() {
+    const body = {
+      username: document.getElementById("regUser").value,
+      email: document.getElementById("regEmail").value,
+      password: document.getElementById("regPass").value
+    };
+    const res = await fetch(`${API}/auth/register`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showAuthAlert("Account created! Please login.", "success");
+      switchAuth("login");
+    } else {
+      showAuthAlert(data.detail || "Registration failed");
+    }
+  }
+
+  function showApp() {
+    document.getElementById("authSection").style.display = "none";
+    document.getElementById("appSection").style.display = "block";
+    document.getElementById("sidebarUser").textContent = localStorage.getItem("tf_user") || "";
+    loadTasks();
+  }
+
+  function logout() {
+    localStorage.removeItem("tf_token");
+    localStorage.removeItem("tf_user");
+    token = null;
+    document.getElementById("authSection").style.display = "flex";
+    document.getElementById("appSection").style.display = "none";
+  }
+
+  async function loadTasks() {
+    let url = `${API}/tasks/`;
+    if (currentFilter !== "all") url += `?status=${currentFilter}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) { logout(); return; }
+    const tasks = await res.json();
+    renderStats(tasks);
+    renderTasks(tasks);
+    document.getElementById("taskCount").textContent = `${tasks.length} task(s)`;
+  }
+
+  function renderStats(tasks) {
+    const pending = tasks.filter(t => t.status === "pending").length;
+    const inProgress = tasks.filter(t => t.status === "in_progress").length;
+    const completed = tasks.filter(t => t.status === "completed").length;
+    const high = tasks.filter(t => t.priority === "high").length;
+    document.getElementById("statsRow").innerHTML = `
+      ${statCard("bi-clock", "Pending", pending, "#f59e0b")}
+      ${statCard("bi-arrow-repeat", "In Progress", inProgress, "#3b82f6")}
+      ${statCard("bi-check-circle", "Completed", completed, "#10b981")}
+      ${statCard("bi-exclamation-triangle", "High Priority", high, "#ef4444")}
+    `;
+  }
+
+  function statCard(icon, label, count, color) {
+    return `<div class="col-6 col-md-3">
+      <div class="card task-card p-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi ${icon} fs-4" style="color:${color}"></i>
+          <div><div class="fw-bold fs-5">${count}</div><div class="text-muted small">${label}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderTasks(tasks) {
+    const container = document.getElementById("tasksContainer");
+    if (!tasks.length) {
+      container.innerHTML = `<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i>No tasks found</div>`;
+      return;
+    }
+    container.innerHTML = tasks.map(task => {
+      const now = new Date();
+      const deadline = task.deadline ? new Date(task.deadline) : null;
+      let cardClass = "";
+      if (deadline && task.status !== "completed") {
+        if (deadline < now) cardClass = "deadline-over";
+        else if ((deadline - now) < 24 * 3600 * 1000) cardClass = "deadline-near";
+      }
+      return `
+      <div class="col-12 col-md-6">
+        <div class="card task-card p-3 ${cardClass}">
+          <div class="d-flex justify-content-between align-items-start">
+            <h6 class="fw-bold mb-1">${task.title}</h6>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-light" onclick="openEditModal(${JSON.stringify(task).replace(/"/g, '&quot;')})"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-light text-danger" onclick="deleteTask(${task.id})"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+          <p class="text-muted small mb-2">${task.description || "No description"}</p>
+          <div class="d-flex flex-wrap gap-1 align-items-center">
+            <span class="badge badge-${task.priority} rounded-pill">${task.priority}</span>
+            <span class="badge badge-${task.status} rounded-pill">${task.status.replace("_", " ")}</span>
+            ${deadline ? `<span class="text-muted small ms-auto"><i class="bi bi-calendar3 me-1"></i>${deadline.toLocaleDateString()}</span>` : ""}
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function filterTasks(filter) {
+    currentFilter = filter;
+    document.getElementById("pageTitle").textContent = filter === "all" ? "All Tasks" : filter.replace("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+    document.querySelectorAll(".sidebar .nav-link").forEach(el => el.classList.remove("active"));
+    event.target.classList.add("active");
+    loadTasks();
+  }
+
+  function openCreateModal() {
+    document.getElementById("modalTitle").textContent = "New Task";
+    document.getElementById("editTaskId").value = "";
+    document.getElementById("taskTitle").value = "";
+    document.getElementById("taskDesc").value = "";
+    document.getElementById("taskPriority").value = "medium";
+    document.getElementById("taskStatus").value = "pending";
+    document.getElementById("taskDeadline").value = "";
+  }
+
+  function openEditModal(task) {
+    document.getElementById("modalTitle").textContent = "Edit Task";
+    document.getElementById("editTaskId").value = task.id;
+    document.getElementById("taskTitle").value = task.title;
+    document.getElementById("taskDesc").value = task.description;
+    document.getElementById("taskPriority").value = task.priority;
+    document.getElementById("taskStatus").value = task.status;
+    document.getElementById("taskDeadline").value = task.deadline ? task.deadline.slice(0, 16) : "";
+    new bootstrap.Modal(document.getElementById("taskModal")).show();
+  }
+
+  async function saveTask() {
+    const id = document.getElementById("editTaskId").value;
+    const body = {
+      title: document.getElementById("taskTitle").value,
+      description: document.getElementById("taskDesc").value,
+      priority: document.getElementById("taskPriority").value,
+      status: document.getElementById("taskStatus").value,
+      deadline: document.getElementById("taskDeadline").value || null
+    };
+    const url = id ? `${API}/tasks/${id}` : `${API}/tasks/`;
+    const method = id ? "PUT" : "POST";
+    const res = await fetch(url, {
+      method, headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      bootstrap.Modal.getInstance(document.getElementById("taskModal")).hide();
+      loadTasks();
+    }
+  }
+
+  async function deleteTask(id) {
+    if (!confirm("Delete this task?")) return;
+    await fetch(`${API}/tasks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    loadTasks();
+  }
+</script>
+</body>
+</html>
